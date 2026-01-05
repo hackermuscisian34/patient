@@ -1,0 +1,19 @@
+{
+  "patient_id": "PATIENT001",
+  "gps_port": "/dev/ttyS0",
+  "gps_baudrate": 9600,
+  "gsm_port": "/dev/ttyUSB0",
+  "gsm_baudrate": 115200,
+  "server_url": "",
+  "update_interval": 30,
+  "emergency_numbers": [
+    "+918848776875",
+    "+9175929912412"
+  ],
+  "geofence": {
+    "enabled": true,
+    "latitude": 40.7128,
+    "longitude": -74.006,
+    "radius": 100
+  }
+}

@@ -1,0 +1,2 @@
+2026-01-05 21:36:49,290 - INFO - Database initialized successfully
+2026-01-05 21:36:49,290 - ERROR - Serial port initialization failed: could not open port '/dev/ttyS0': FileNotFoundError(2, 'The system cannot find the path specified.', None, 3)
