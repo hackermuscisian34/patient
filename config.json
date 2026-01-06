@@ -1,8 +1,8 @@
 {
   "patient_id": "PATIENT001",
-  "gps_port": "/dev/ttyS0",
+  "gps_port": "COM1",
   "gps_baudrate": 9600,
-  "gsm_port": "/dev/ttyUSB0",
+  "gsm_port": "COM2",
   "gsm_baudrate": 115200,
   "server_url": "",
   "update_interval": 30,

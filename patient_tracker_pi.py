@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Patient Tracking System using Raspberry Pi Zero WH, SIM800L GSM Module, and NEO-6M GPS Module
+Patient Tracking System for Raspberry Pi Zero WH
+Hardcoded for actual hardware with terminal output
 Author: Patient Tracking System
 Date: 2025
 """
@@ -20,12 +21,28 @@ from sys import exit
 
 class PatientTracker:
     def __init__(self):
-        # Configuration
-        self.config = self.load_config()
+        print("=" * 60)
+        print("PATIENT TRACKING SYSTEM - RASPBERRY PI ZERO WH")
+        print("=" * 60)
+        
+        # Hardcoded Raspberry Pi configuration
+        self.patient_id = "PATIENT001"
+        self.gps_port = "/dev/ttyS0"
+        self.gps_baudrate = 9600
+        self.gsm_port = "/dev/ttyUSB0"
+        self.gsm_baudrate = 115200
+        self.update_interval = 10  # seconds
+        self.emergency_numbers = ["+918848776875", "+9175929912412"]
+        
+        # Geofence configuration (hardcoded)
+        self.geofence_enabled = True
+        self.geofence_lat = 40.7128
+        self.geofence_lon = -74.0060
+        self.geofence_radius = 100  # meters
         
         # Serial ports
-        self.gps_port = None
-        self.gsm_port = None
+        self.gps_serial = None
+        self.gsm_serial = None
         
         # Database
         self.db_conn = None
@@ -33,57 +50,21 @@ class PatientTracker:
         # Tracking state
         self.is_tracking = False
         self.current_location = None
-        self.patient_id = self.config.get('patient_id', 'PATIENT001')
-        
-        # Setup logging
-        self.setup_logging()
         
         # Initialize components
         self.initialize_database()
-        self.initialize_serial_ports()
+        self.initialize_hardware()
         
-    def load_config(self):
-        """Load configuration from config.json"""
-        try:
-            with open('config.json', 'r') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            # Default configuration (cross-platform)
-            default_config = {
-                "patient_id": "PATIENT001",
-                "gps_port": "COM1" if os.name == 'nt' else "/dev/ttyS0",
-                "gps_baudrate": 9600,
-                "gsm_port": "COM2" if os.name == 'nt' else "/dev/ttyUSB0",
-                "gsm_baudrate": 115200,
-                "server_url": "http://your-server.com/api/location",
-                "update_interval": 30,
-                "emergency_numbers": ["+918848776875", "+9175929912412"],
-                "geofence": {
-                    "enabled": True,
-                    "latitude": 40.7128,
-                    "longitude": -74.0060,
-                    "radius": 100
-                }
-            }
-            with open('config.json', 'w') as f:
-                json.dump(default_config, f, indent=4)
-            return default_config
-    
-    def setup_logging(self):
-        """Setup logging configuration"""
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('patient_tracker.log'),
-                logging.StreamHandler()
-            ]
-        )
-        self.logger = logging.getLogger(__name__)
-    
+        print(f"✓ Patient ID: {self.patient_id}")
+        print(f"✓ GPS Port: {self.gps_port} @ {self.gps_baudrate} baud")
+        print(f"✓ GSM Port: {self.gsm_port} @ {self.gsm_baudrate} baud")
+        print(f"✓ Update Interval: {self.update_interval} seconds")
+        print(f"✓ Geofence: {self.geofence_enabled} (radius: {self.geofence_radius}m)")
+        
     def initialize_database(self):
-        """Initialize SQLite database for storing location data"""
+        """Initialize SQLite database"""
         try:
+            print("\n[DATABASE] Initializing...")
             self.db_conn = sqlite3.connect('patient_tracking.db', check_same_thread=False)
             cursor = self.db_conn.cursor()
             
@@ -125,67 +106,82 @@ class PatientTracker:
             ''')
             
             self.db_conn.commit()
-            self.logger.info("Database initialized successfully")
+            print("✓ Database initialized successfully")
             
         except Exception as e:
-            self.logger.error(f"Database initialization failed: {e}")
+            print(f"✗ Database initialization failed: {e}")
             raise
     
-    def initialize_serial_ports(self):
-        """Initialize GPS and GSM serial connections"""
+    def initialize_hardware(self):
+        """Initialize GPS and GSM hardware"""
         try:
-            # Initialize GPS
-            self.gps_port = serial.Serial(
-                self.config['gps_port'],
-                self.config['gps_baudrate'],
+            print("\n[GPS] Initializing GPS module...")
+            self.gps_serial = serial.Serial(
+                self.gps_port,
+                self.gps_baudrate,
                 timeout=1
             )
-            self.logger.info(f"GPS initialized on {self.config['gps_port']}")
+            print(f"✓ GPS connected on {self.gps_port}")
             
-            # Initialize GSM
-            self.gsm_port = serial.Serial(
-                self.config['gsm_port'],
-                self.config['gsm_baudrate'],
+            print("\n[GSM] Initializing GSM module...")
+            self.gsm_serial = serial.Serial(
+                self.gsm_port,
+                self.gsm_baudrate,
                 timeout=1
             )
-            self.logger.info(f"GSM initialized on {self.config['gsm_port']}")
+            print(f"✓ GSM connected on {self.gsm_port}")
             
             # Test GSM module
             self.test_gsm_module()
             
         except Exception as e:
-            self.logger.error(f"Serial port initialization failed: {e}")
+            print(f"✗ Hardware initialization failed: {e}")
+            print("  Make sure:")
+            print("  - GPS is connected to GPIO 14/15 (ttyS0)")
+            print("  - GSM is connected to USB (ttyUSB0)")
+            print("  - User has permission to access serial ports")
+            print("  Try: sudo usermod -a -G dialout $USER")
             raise
     
     def test_gsm_module(self):
         """Test GSM module connectivity"""
         try:
-            self.send_gsm_command('AT')
+            print("\n[GSM] Testing module...")
+            
+            # Basic AT command
+            response = self.send_gsm_command('AT')
+            if 'OK' in response:
+                print("✓ GSM module responding")
+            else:
+                print("✗ GSM module not responding")
+                return
+            
+            # Get module info
             response = self.send_gsm_command('ATI')
-            self.logger.info(f"GSM Module Info: {response}")
+            print(f"✓ GSM Module: {response}")
             
             # Check signal strength
-            signal_strength = self.send_gsm_command('AT+CSQ')
-            self.logger.info(f"Signal Strength: {signal_strength}")
+            response = self.send_gsm_command('AT+CSQ')
+            print(f"✓ Signal Strength: {response}")
             
             # Set SMS mode to text
             self.send_gsm_command('AT+CMGF=1')
+            print("✓ SMS mode set to text")
             
         except Exception as e:
-            self.logger.error(f"GSM module test failed: {e}")
-            raise
+            print(f"✗ GSM test failed: {e}")
     
     def send_gsm_command(self, command, wait_time=1):
         """Send command to GSM module and return response"""
         try:
-            self.gsm_port.write((command + '\r\n').encode())
+            self.gsm_serial.write((command + '\r\n').encode())
             time.sleep(wait_time)
             response = ''
-            while self.gsm_port.in_waiting > 0:
-                response += self.gsm_port.read(self.gsm_port.in_waiting).decode()
+            while self.gsm_serial.in_waiting > 0:
+                response += self.gsm_serial.read(self.gsm_serial.in_waiting).decode()
             return response.strip()
         except Exception as e:
-            self.logger.error(f"GSM command failed: {command} - {e}")
+            print(f"GSM command failed: {command} - {e}")
             return ''
     
     def parse_gps_data(self, gps_data):
@@ -212,20 +208,20 @@ class PatientTracker:
                         'fix_valid': msg.is_valid
                     }
         except Exception as e:
-            self.logger.error(f"GPS parsing error: {e}")
+            print(f"GPS parsing error: {e}")
         return None
     
     def get_gps_location(self):
         """Get current GPS location"""
         try:
-            if self.gps_port.in_waiting > 0:
-                gps_data = self.gps_port.read(self.gps_port.in_waiting).decode()
+            if self.gps_serial.in_waiting > 0:
+                gps_data = self.gps_serial.read(self.gps_serial.in_waiting).decode()
                 location = self.parse_gps_data(gps_data)
                 if location:
                     self.current_location = location
                     return location
         except Exception as e:
-            self.logger.error(f"GPS reading error: {e}")
+            print(f"GPS reading error: {e}")
         return None
     
     def store_location(self, location):
@@ -247,11 +243,11 @@ class PatientTracker:
             ))
             self.db_conn.commit()
         except Exception as e:
-            self.logger.error(f"Database storage error: {e}")
+            print(f"Database storage error: {e}")
     
     def check_geofence(self, location):
         """Check if patient is within geofence"""
-        if not self.config['geofence']['enabled']:
+        if not self.geofence_enabled:
             return True
         
         try:
@@ -259,8 +255,8 @@ class PatientTracker:
             
             lat1 = math.radians(location['latitude'])
             lon1 = math.radians(location['longitude'])
-            lat2 = math.radians(self.config['geofence']['latitude'])
-            lon2 = math.radians(self.config['geofence']['longitude'])
+            lat2 = math.radians(self.geofence_lat)
+            lon2 = math.radians(self.geofence_lon)
             
             # Haversine formula
             dlat = lat2 - lat1
@@ -270,7 +266,7 @@ class PatientTracker:
             r = 6371  # Earth's radius in km
             distance = c * r * 1000  # Convert to meters
             
-            if distance > self.config['geofence']['radius']:
+            if distance > self.geofence_radius:
                 self.trigger_alert('GEOFENCE_BREACH', 
                                  f"Patient left safe area. Distance: {distance:.2f}m",
                                  location['latitude'], location['longitude'])
@@ -279,12 +275,17 @@ class PatientTracker:
             return True
             
         except Exception as e:
-            self.logger.error(f"Geofence check error: {e}")
+            print(f"Geofence check error: {e}")
             return True
     
     def trigger_alert(self, alert_type, message, latitude, longitude):
         """Trigger alert and send notifications"""
         try:
+            print(f"\n🚨 ALERT: {alert_type}")
+            print(f"   Message: {message}")
+            print(f"   Location: {latitude:.6f}, {longitude:.6f}")
+            print(f"   Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
             # Store alert in database
             cursor = self.db_conn.cursor()
             cursor.execute('''
@@ -295,84 +296,70 @@ class PatientTracker:
             self.db_conn.commit()
             
             # Send SMS alerts
-            for number in self.config['emergency_numbers']:
+            for number in self.emergency_numbers:
+                print(f"   Sending SMS to {number}...")
                 self.send_sms_alert(number, f"ALERT: {message}")
             
-            self.logger.warning(f"Alert triggered: {alert_type} - {message}")
-            
         except Exception as e:
-            self.logger.error(f"Alert triggering failed: {e}")
+            print(f"Alert triggering failed: {e}")
     
     def send_sms_alert(self, phone_number, message):
         """Send SMS alert via GSM module"""
         try:
             self.send_gsm_command(f'AT+CMGS="{phone_number}"', wait_time=2)
-            self.gsm_port.write((message + '\x1A').encode())
+            self.gsm_serial.write((message + '\x1A').encode())
             time.sleep(2)
             response = self.send_gsm_command('', wait_time=2)
-            self.logger.info(f"SMS sent to {phone_number}: {message}")
+            print(f"   ✓ SMS sent to {phone_number}")
         except Exception as e:
-            self.logger.error(f"SMS sending failed: {e}")
-    
-    def upload_to_server(self, location):
-        """Upload location data to server"""
-        try:
-            if not self.config.get('server_url'):
-                return
-            
-            data = {
-                'patient_id': self.patient_id,
-                'latitude': location['latitude'],
-                'longitude': location['longitude'],
-                'altitude': location.get('altitude'),
-                'timestamp': location['timestamp'].isoformat(),
-                'speed': location.get('speed')
-            }
-            
-            response = requests.post(
-                self.config['server_url'],
-                json=data,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                self.logger.info("Location uploaded to server successfully")
-            else:
-                self.logger.warning(f"Server upload failed: {response.status_code}")
-                
-        except Exception as e:
-            self.logger.error(f"Server upload error: {e}")
+            print(f"   ✗ SMS sending failed: {e}")
     
     def tracking_loop(self):
-        """Main tracking loop"""
-        self.logger.info("Starting patient tracking...")
+        """Main tracking loop with terminal output"""
+        print(f"\n[TRACKING] Starting patient tracking...")
+        print(f"   Update interval: {self.update_interval} seconds")
+        print(f"   Press Ctrl+C to stop")
+        print("-" * 60)
         
+        loop_count = 0
         while self.is_tracking:
             try:
+                loop_count += 1
+                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Update #{loop_count}")
+                
                 # Get GPS location
                 location = self.get_gps_location()
                 
                 if location:
+                    print(f"   📍 Location: {location['latitude']:.6f}, {location['longitude']:.6f}")
+                    if location.get('altitude'):
+                        print(f"   🏔️  Altitude: {location['altitude']:.1f}m")
+                    if location.get('speed'):
+                        print(f"   🚗 Speed: {location['speed']:.1f} knots")
+                    if location.get('satellites'):
+                        print(f"   🛰️  Satellites: {location['satellites']}")
+                    
                     # Store location
                     self.store_location(location)
+                    print("   💾 Location saved to database")
                     
                     # Check geofence
-                    self.check_geofence(location)
+                    geofence_status = self.check_geofence(location)
+                    if geofence_status:
+                        print("   ✅ Within safe area")
                     
-                    # Upload to server
-                    self.upload_to_server(location)
-                    
-                    self.logger.info(f"Location updated: {location['latitude']:.6f}, {location['longitude']:.6f}")
                 else:
-                    self.logger.warning("No GPS data available")
+                    print("   ⚠️  No GPS data available")
+                    print("   📡 Waiting for satellite lock...")
                 
                 # Wait for next update
-                time.sleep(self.config['update_interval'])
+                print(f"   ⏳ Next update in {self.update_interval} seconds...")
+                time.sleep(self.update_interval)
                 
             except KeyboardInterrupt:
                 break
             except Exception as e:
-                self.logger.error(f"Tracking loop error: {e}")
+                print(f"   ✗ Tracking error: {e}")
                 time.sleep(5)
     
     def start_tracking(self):
@@ -382,32 +369,34 @@ class PatientTracker:
             self.tracking_thread = threading.Thread(target=self.tracking_loop)
             self.tracking_thread.daemon = True
             self.tracking_thread.start()
-            self.logger.info("Patient tracking started")
     
     def stop_tracking(self):
         """Stop patient tracking"""
         self.is_tracking = False
         if hasattr(self, 'tracking_thread'):
             self.tracking_thread.join()
-        self.logger.info("Patient tracking stopped")
     
     def cleanup(self):
         """Cleanup resources"""
         try:
+            print("\n[CLEANUP] Shutting down...")
             self.stop_tracking()
-            if self.gps_port:
-                self.gps_port.close()
-            if self.gsm_port:
-                self.gsm_port.close()
+            if self.gps_serial:
+                self.gps_serial.close()
+                print("✓ GPS port closed")
+            if self.gsm_serial:
+                self.gsm_serial.close()
+                print("✓ GSM port closed")
             if self.db_conn:
                 self.db_conn.close()
-            self.logger.info("Cleanup completed")
+                print("✓ Database closed")
+            print("✓ Cleanup completed")
         except Exception as e:
-            self.logger.error(f"Cleanup error: {e}")
+            print(f"✗ Cleanup error: {e}")
 
 def signal_handler(sig, frame):
     """Handle Ctrl+C gracefully"""
-    print('\nShutting down patient tracking system...')
+    print('\n\n[SHUTDOWN] Received interrupt signal...')
     tracker.cleanup()
     exit(0)
 
@@ -425,6 +414,7 @@ if __name__ == "__main__":
             time.sleep(1)
             
     except Exception as e:
-        print(f"Fatal error: {e}")
-        tracker.cleanup()
+        print(f"\n[ERROR] Fatal error: {e}")
+        if 'tracker' in locals():
+            tracker.cleanup()
         exit(1)

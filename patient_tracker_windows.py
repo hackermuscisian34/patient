@@ -1,29 +1,46 @@
 #!/usr/bin/env python3
 """
-Patient Tracking System using Raspberry Pi Zero WH, SIM800L GSM Module, and NEO-6M GPS Module
-Author: Patient Tracking System
-Date: 2025
+Patient Tracking System - Windows Test Version
+Simulates GPS and GSM modules for testing without hardware
 """
 
-import serial
 import time
 import json
 import sqlite3
 import threading
 import logging
 from datetime import datetime
-import pynmea2
-import requests
-import os
-from signal import signal, SIGINT
-from sys import exit
+import random
+import math
 
-class PatientTracker:
+class MockSerial:
+    """Mock serial port for testing"""
+    def __init__(self, port, baudrate, timeout=1):
+        self.port = port
+        self.baudrate = baudrate
+        self.timeout = timeout
+        self.in_waiting = 0
+        self.buffer = ""
+        
+    def write(self, data):
+        pass
+        
+    def read(self, size):
+        # Simulate GPS NMEA data
+        if "COM1" in self.port:  # GPS
+            nmea = f"$GPGGA,{datetime.now().strftime('%H%M%S')},{40.7128 + random.uniform(-0.001, 0.001):.4f},{'N'},{-74.0060 + random.uniform(-0.001, 0.001):.4f},{'W'},1,08,0.9,10.0,M,46.9,M,,*47\r\n"
+            return nmea.encode()
+        return b""
+        
+    def close(self):
+        pass
+
+class PatientTrackerWindows:
     def __init__(self):
         # Configuration
         self.config = self.load_config()
         
-        # Serial ports
+        # Serial ports (mocked for Windows)
         self.gps_port = None
         self.gsm_port = None
         
@@ -48,15 +65,15 @@ class PatientTracker:
             with open('config.json', 'r') as f:
                 return json.load(f)
         except FileNotFoundError:
-            # Default configuration (cross-platform)
+            # Default configuration for Windows
             default_config = {
                 "patient_id": "PATIENT001",
-                "gps_port": "COM1" if os.name == 'nt' else "/dev/ttyS0",
+                "gps_port": "COM1",
                 "gps_baudrate": 9600,
-                "gsm_port": "COM2" if os.name == 'nt' else "/dev/ttyUSB0",
+                "gsm_port": "COM2",
                 "gsm_baudrate": 115200,
-                "server_url": "http://your-server.com/api/location",
-                "update_interval": 30,
+                "server_url": "",
+                "update_interval": 5,
                 "emergency_numbers": ["+918848776875", "+9175929912412"],
                 "geofence": {
                     "enabled": True,
@@ -132,25 +149,25 @@ class PatientTracker:
             raise
     
     def initialize_serial_ports(self):
-        """Initialize GPS and GSM serial connections"""
+        """Initialize GPS and GSM serial connections (mocked for Windows)"""
         try:
-            # Initialize GPS
-            self.gps_port = serial.Serial(
+            # Initialize GPS (mock)
+            self.gps_port = MockSerial(
                 self.config['gps_port'],
                 self.config['gps_baudrate'],
                 timeout=1
             )
-            self.logger.info(f"GPS initialized on {self.config['gps_port']}")
+            self.logger.info(f"GPS simulated on {self.config['gps_port']}")
             
-            # Initialize GSM
-            self.gsm_port = serial.Serial(
+            # Initialize GSM (mock)
+            self.gsm_port = MockSerial(
                 self.config['gsm_port'],
                 self.config['gsm_baudrate'],
                 timeout=1
             )
-            self.logger.info(f"GSM initialized on {self.config['gsm_port']}")
+            self.logger.info(f"GSM simulated on {self.config['gsm_port']}")
             
-            # Test GSM module
+            # Test GSM module (mock)
             self.test_gsm_module()
             
         except Exception as e:
@@ -158,59 +175,30 @@ class PatientTracker:
             raise
     
     def test_gsm_module(self):
-        """Test GSM module connectivity"""
+        """Test GSM module connectivity (mock)"""
         try:
-            self.send_gsm_command('AT')
-            response = self.send_gsm_command('ATI')
-            self.logger.info(f"GSM Module Info: {response}")
-            
-            # Check signal strength
-            signal_strength = self.send_gsm_command('AT+CSQ')
-            self.logger.info(f"Signal Strength: {signal_strength}")
-            
-            # Set SMS mode to text
-            self.send_gsm_command('AT+CMGF=1')
+            self.logger.info("GSM Module: SIM800L Mock")
+            self.logger.info("Signal Strength: Mock Signal")
+            self.logger.info("SMS mode: Text mode enabled")
             
         except Exception as e:
             self.logger.error(f"GSM module test failed: {e}")
             raise
     
-    def send_gsm_command(self, command, wait_time=1):
-        """Send command to GSM module and return response"""
-        try:
-            self.gsm_port.write((command + '\r\n').encode())
-            time.sleep(wait_time)
-            response = ''
-            while self.gsm_port.in_waiting > 0:
-                response += self.gsm_port.read(self.gsm_port.in_waiting).decode()
-            return response.strip()
-        except Exception as e:
-            self.logger.error(f"GSM command failed: {command} - {e}")
-            return ''
-    
     def parse_gps_data(self, gps_data):
-        """Parse NMEA GPS data"""
+        """Parse NMEA GPS data (simplified)"""
         try:
-            for line in gps_data.split('\n'):
-                if line.startswith('$GPGGA'):
-                    msg = pynmea2.parse(line)
-                    return {
-                        'latitude': msg.latitude,
-                        'longitude': msg.longitude,
-                        'altitude': msg.altitude,
-                        'timestamp': datetime.now(),
-                        'fix_quality': msg.gps_qual,
-                        'satellites': msg.num_sats
-                    }
-                elif line.startswith('$GPRMC'):
-                    msg = pynmea2.parse(line)
-                    return {
-                        'latitude': msg.latitude,
-                        'longitude': msg.longitude,
-                        'speed': msg.spd_over_grnd,
-                        'timestamp': datetime.now(),
-                        'fix_valid': msg.is_valid
-                    }
+            # Simple parsing for demo
+            if "$GPGGA" in gps_data:
+                # Generate mock location data
+                return {
+                    'latitude': 40.7128 + random.uniform(-0.01, 0.01),
+                    'longitude': -74.0060 + random.uniform(-0.01, 0.01),
+                    'altitude': 10.0 + random.uniform(-5, 5),
+                    'timestamp': datetime.now(),
+                    'fix_quality': 1,
+                    'satellites': 8
+                }
         except Exception as e:
             self.logger.error(f"GPS parsing error: {e}")
         return None
@@ -218,12 +206,12 @@ class PatientTracker:
     def get_gps_location(self):
         """Get current GPS location"""
         try:
-            if self.gps_port.in_waiting > 0:
-                gps_data = self.gps_port.read(self.gps_port.in_waiting).decode()
-                location = self.parse_gps_data(gps_data)
-                if location:
-                    self.current_location = location
-                    return location
+            # Simulate GPS data availability
+            gps_data = self.gps_port.read(100).decode()
+            location = self.parse_gps_data(gps_data)
+            if location:
+                self.current_location = location
+                return location
         except Exception as e:
             self.logger.error(f"GPS reading error: {e}")
         return None
@@ -241,7 +229,7 @@ class PatientTracker:
                 location.get('latitude'),
                 location.get('longitude'),
                 location.get('altitude'),
-                location.get('speed'),
+                location.get('speed', 0.0),
                 location.get('timestamp'),
                 location.get('accuracy', 10.0)
             ))
@@ -255,8 +243,6 @@ class PatientTracker:
             return True
         
         try:
-            import math
-            
             lat1 = math.radians(location['latitude'])
             lon1 = math.radians(location['longitude'])
             lat2 = math.radians(self.config['geofence']['latitude'])
@@ -283,7 +269,7 @@ class PatientTracker:
             return True
     
     def trigger_alert(self, alert_type, message, latitude, longitude):
-        """Trigger alert and send notifications"""
+        """Trigger alert and send notifications (mock)"""
         try:
             # Store alert in database
             cursor = self.db_conn.cursor()
@@ -294,54 +280,14 @@ class PatientTracker:
             ''', (self.patient_id, alert_type, message, latitude, longitude, datetime.now()))
             self.db_conn.commit()
             
-            # Send SMS alerts
+            # Mock SMS alerts
             for number in self.config['emergency_numbers']:
-                self.send_sms_alert(number, f"ALERT: {message}")
+                self.logger.info(f"MOCK SMS to {number}: ALERT: {message}")
             
             self.logger.warning(f"Alert triggered: {alert_type} - {message}")
             
         except Exception as e:
             self.logger.error(f"Alert triggering failed: {e}")
-    
-    def send_sms_alert(self, phone_number, message):
-        """Send SMS alert via GSM module"""
-        try:
-            self.send_gsm_command(f'AT+CMGS="{phone_number}"', wait_time=2)
-            self.gsm_port.write((message + '\x1A').encode())
-            time.sleep(2)
-            response = self.send_gsm_command('', wait_time=2)
-            self.logger.info(f"SMS sent to {phone_number}: {message}")
-        except Exception as e:
-            self.logger.error(f"SMS sending failed: {e}")
-    
-    def upload_to_server(self, location):
-        """Upload location data to server"""
-        try:
-            if not self.config.get('server_url'):
-                return
-            
-            data = {
-                'patient_id': self.patient_id,
-                'latitude': location['latitude'],
-                'longitude': location['longitude'],
-                'altitude': location.get('altitude'),
-                'timestamp': location['timestamp'].isoformat(),
-                'speed': location.get('speed')
-            }
-            
-            response = requests.post(
-                self.config['server_url'],
-                json=data,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                self.logger.info("Location uploaded to server successfully")
-            else:
-                self.logger.warning(f"Server upload failed: {response.status_code}")
-                
-        except Exception as e:
-            self.logger.error(f"Server upload error: {e}")
     
     def tracking_loop(self):
         """Main tracking loop"""
@@ -358,9 +304,6 @@ class PatientTracker:
                     
                     # Check geofence
                     self.check_geofence(location)
-                    
-                    # Upload to server
-                    self.upload_to_server(location)
                     
                     self.logger.info(f"Location updated: {location['latitude']:.6f}, {location['longitude']:.6f}")
                 else:
@@ -405,26 +348,23 @@ class PatientTracker:
         except Exception as e:
             self.logger.error(f"Cleanup error: {e}")
 
-def signal_handler(sig, frame):
-    """Handle Ctrl+C gracefully"""
-    print('\nShutting down patient tracking system...')
-    tracker.cleanup()
-    exit(0)
-
 if __name__ == "__main__":
-    # Setup signal handler
-    signal(SIGINT, signal_handler)
-    
     try:
         # Create and start tracker
-        tracker = PatientTracker()
+        tracker = PatientTrackerWindows()
         tracker.start_tracking()
+        
+        print("Patient tracking started. Press Ctrl+C to stop.")
+        print("This is a Windows test version with simulated GPS/GSM modules.")
         
         # Keep main thread alive
         while True:
             time.sleep(1)
             
+    except KeyboardInterrupt:
+        print('\nShutting down patient tracking system...')
+        tracker.cleanup()
     except Exception as e:
         print(f"Fatal error: {e}")
-        tracker.cleanup()
-        exit(1)
+        if 'tracker' in locals():
+            tracker.cleanup()
