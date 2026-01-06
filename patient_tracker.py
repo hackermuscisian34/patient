@@ -48,7 +48,7 @@ class PatientTracker:
             with open('config.json', 'r') as f:
                 return json.load(f)
         except FileNotFoundError:
-            # Default configuration
+            # Default configuration for Raspberry Pi
             default_config = {
                 "patient_id": "PATIENT001",
                 "gps_port": "/dev/ttyS0",
